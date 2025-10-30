@@ -46,7 +46,7 @@ jobs:
         with:
           name: compile-items
           path: |
-            obj/Debug/**/compile_items_*.txt
+            obj/**/compile_items_*.txt
 
       - name: Show summary
         run: |
