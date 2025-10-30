@@ -1,0 +1,33 @@
+name: Verify ListCompileItems
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: {}
+
+jobs:
+  verify-list-compile-items:
+    name: Run ListCompileItems verifier
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - name: Restore
+        run: dotnet restore "reserve flow ai 2026.sln"
+
+      - name: Restore workloads
+        run: |
+          dotnet workload restore || true
+
+      - name: Run verifier script
+        shell: pwsh
+        run: |
+          Write-Host "Running verify_list_compile_items.ps1 to ensure obj/**/compile_items_*.txt are present"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify_list_compile_items.ps1 -Project "reserve flow ai 2026.csproj" -Configuration Debug
