@@ -1,0 +1,239 @@
+name: Performance Monitoring
+
+on:
+  # Run daily at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      baseline_update:
+        description: 'Update performance baseline?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      notify_on_regression:
+        description: 'Send notification on regression?'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+  # Run on pushes to main branch (lighter version)
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'vite.config.ts'
+      - 'scripts/performance-monitoring.js'
+
+env:
+  NODE_VERSION: "18"
+  PNPM_VERSION: "8"
+
+jobs:
+  # Full Performance Monitoring (scheduled/manual)
+  performance-monitoring:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for trend analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run comprehensive performance monitoring
+        run: pnpm run performance:monitor
+
+      - name: Generate performance report
+        run: |
+          echo "## Performance Monitoring Report" > performance-report.md
+          echo "" >> performance-report.md
+          echo "**Date:** $(date -u)" >> performance-report.md
+          echo "**Branch:** ${GITHUB_REF#refs/heads/}" >> performance-report.md
+          echo "**Commit:** ${GITHUB_SHA}" >> performance-report.md
+          echo "" >> performance-report.md
+
+          if [ -f "performance-baseline.json" ]; then
+            echo "### Build Performance" >> performance-report.md
+            echo "- **Build Time:** $(jq -r '.metrics.build.buildTime' performance-baseline.json)ms" >> performance-report.md
+            echo "- **Bundle Size:** $(jq -r '.metrics.build.bundleSizeMB' performance-baseline.json)MB" >> performance-report.md
+            echo "" >> performance-report.md
+
+            echo "### Platform Sync Performance" >> performance-report.md
+            echo "- **iOS Sync:** $(jq -r '.metrics.capacitorSync.ios.syncTime' performance-baseline.json)ms" >> performance-report.md
+            echo "- **Android Sync:** $(jq -r '.metrics.capacitorSync.android.syncTime' performance-baseline.json)ms" >> performance-report.md
+            echo "- **Electron Sync:** $(jq -r '.metrics.capacitorSync.electron.syncTime' performance-baseline.json)ms" >> performance-report.md
+            echo "" >> performance-report.md
+
+            echo "### System Resources" >> performance-report.md
+            echo "- **CPU Cores:** $(jq -r '.metrics.system.cpuCount' performance-baseline.json)" >> performance-report.md
+            echo "- **Total Memory:** $(jq -r '.metrics.system.totalMemoryMB' performance-baseline.json)MB" >> performance-report.md
+            echo "- **Memory Usage:** $(jq -r '.metrics.system.memoryUsagePercent' performance-baseline.json)%" >> performance-report.md
+            echo "" >> performance-report.md
+
+            echo "### Test Results" >> performance-report.md
+            echo "- **File I/O Write:** $(jq -r '.metrics.fileIO.writeTime' performance-baseline.json)ms" >> performance-report.md
+            echo "- **File I/O Read:** $(jq -r '.metrics.fileIO.readTime' performance-baseline.json)ms" >> performance-report.md
+            echo "- **Network Test:** $(jq -r '.metrics.network.responseTime' performance-baseline.json)ms" >> performance-report.md
+          else
+            echo "No performance data available" >> performance-report.md
+          fi
+
+      - name: Check for performance regressions
+        run: |
+          # Compare with previous baseline if it exists
+          if [ -f "performance-baseline.json" ]; then
+            # Extract current metrics
+            CURRENT_BUILD_TIME=$(jq -r '.metrics.build.buildTime' performance-baseline.json)
+            CURRENT_BUNDLE_SIZE=$(jq -r '.metrics.build.bundleSize' performance-baseline.json)
+
+            # Define acceptable thresholds (can be adjusted)
+            BUILD_TIME_THRESHOLD=45000  # 45 seconds
+            BUNDLE_SIZE_THRESHOLD=10000000  # 10MB
+
+            # Check for regressions
+            REGRESSION_DETECTED=false
+
+            if [ "$CURRENT_BUILD_TIME" -gt "$BUILD_TIME_THRESHOLD" ]; then
+              echo "🚨 Build time regression detected: ${CURRENT_BUILD_TIME}ms (threshold: ${BUILD_TIME_THRESHOLD}ms)"
+              echo "build_regression=true" >> $GITHUB_ENV
+              REGRESSION_DETECTED=true
+            fi
+
+            if [ "$CURRENT_BUNDLE_SIZE" -gt "$BUNDLE_SIZE_THRESHOLD" ]; then
+              echo "🚨 Bundle size regression detected: ${CURRENT_BUNDLE_SIZE} bytes (threshold: ${BUNDLE_SIZE_THRESHOLD} bytes)"
+              echo "bundle_regression=true" >> $GITHUB_ENV
+              REGRESSION_DETECTED=true
+            fi
+
+            if [ "$REGRESSION_DETECTED" = true ]; then
+              echo "regression_detected=true" >> $GITHUB_ENV
+            fi
+          fi
+
+      - name: Update performance baseline
+        if: github.event.inputs.baseline_update == 'true' || github.event_name == 'schedule'
+        run: |
+          echo "Updating performance baseline..."
+          # The performance monitoring script already saves to performance-baseline.json
+          # We can commit this back to the repository
+
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-monitoring-results
+          path: |
+            performance-baseline.json
+            performance-report.md
+            performance-report.json
+
+      - name: Send notification on regression
+        if: env.regression_detected == 'true' && (github.event.inputs.notify_on_regression != 'false' || github.event_name == 'schedule')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: ['performance-regression'],
+              state: 'open'
+            });
+
+            if (issues.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🚨 Performance Regression Detected',
+                body: `
+                ## Performance Regression Alert
+
+                A performance regression has been detected in the latest monitoring run.
+
+                **Details:**
+                - Build Time: ${process.env.CURRENT_BUILD_TIME}ms
+                - Bundle Size: ${process.env.CURRENT_BUNDLE_SIZE} bytes
+                - Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+                **Action Required:**
+                - Review recent changes for performance impacts
+                - Optimize build process or bundle size
+                - Update performance thresholds if acceptable
+
+                This issue was automatically created by the Performance Monitoring workflow.
+                `,
+                labels: ['performance-regression', 'automated', 'urgent']
+              });
+            }
+
+  # Lightweight Performance Check (on push to main)
+  performance-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "pnpm"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Quick performance check
+        run: |
+          echo "Running quick performance check..."
+
+          # Time the build
+          START_TIME=$(date +%s%3N)
+          pnpm run build > /dev/null 2>&1
+          END_TIME=$(date +%s%3N)
+          BUILD_TIME=$((END_TIME - START_TIME))
+
+          # Check bundle size
+          if [ -d "dist" ]; then
+            BUNDLE_SIZE=$(du -sb dist | cut -f1)
+            BUNDLE_SIZE_MB=$((BUNDLE_SIZE / 1024 / 1024))
+
+            echo "✅ Build completed in ${BUILD_TIME}ms"
+            echo "✅ Bundle size: ${BUNDLE_SIZE_MB}MB"
+
+            # Basic threshold check
+            if [ "$BUILD_TIME" -gt 60000 ]; then
+              echo "⚠️  Build time is slow (${BUILD_TIME}ms > 60s)"
+            fi
+
+            if [ "$BUNDLE_SIZE_MB" -gt 15 ]; then
+              echo "⚠️  Bundle size is large (${BUNDLE_SIZE_MB}MB > 15MB)"
+            fi
+          else
+            echo "❌ Build failed or dist directory not found"
+            exit 1
+          fi
