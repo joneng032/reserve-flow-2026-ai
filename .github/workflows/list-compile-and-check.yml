@@ -39,7 +39,7 @@ jobs:
               # We treat CS0436/CS0579 as errors to prevent duplicate-type regressions.
               # Quote the -warnaserror argument so PowerShell (used on windows runners) doesn't split on the semicolon.
               run: |
-                  dotnet build "reserve flow ai 2026.sln" -c Debug -warnaserror:"CS0436;CS0579" -t:ListCompileItems
+                  dotnet build "reserve flow ai 2026.sln" -c Debug "-warnaserror:CS0436;CS0579" -t:ListCompileItems
 
             - name: Upload compile_items artifacts
               uses: actions/upload-artifact@v4
