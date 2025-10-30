@@ -5,5 +5,6 @@
 bin/
 obj/
 
-# Ignore local user settings
+# Ignore local user settings but keep tracked folder-specific settings
 .vscode/
+!.vscode/settings.json
