@@ -39,8 +39,8 @@ public static class MauiProgram
 		// Use core SpeechService as a fallback until platform-specific speech is implemented
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.ISpeechService, ReserveFlow.Core.Services.SpeechService>();
 		#elif IOS || MACCATALYST
-		// iOS/macOS platform implementations can be added here later
-		builder.Services.AddSingleton<ReserveFlow.Core.Services.IAudioService, ReserveFlow.Core.Services.AudioService>();
+		// iOS/macOS platform implementations
+		builder.Services.AddSingleton<ReserveFlow.Core.Services.IAudioService, reserve_flow_ai_2026.Platforms.iOS.iOSAudioService>();
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.ISpeechService, ReserveFlow.Core.Services.SpeechService>();
 		#else
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.IAudioService, ReserveFlow.Core.Services.AudioService>();
