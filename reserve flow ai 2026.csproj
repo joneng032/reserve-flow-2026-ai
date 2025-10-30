@@ -19,6 +19,13 @@
 		<SingleProject>true</SingleProject>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<!-- Prevent SDK from auto-generating assembly attributes here to avoid duplicate-attribute errors
+		     when building the multi-target MAUI single-project solution. Assembly attributes will be
+		     produced by a single project (e.g., ReserveFlow.Core) or can be provided centrally if needed. -->
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<!-- Also avoid emitting TargetFrameworkAttribute from the MAUI multi-target build so that
+		     only the canonical project (ReserveFlow.Core) supplies assembly-level attributes. -->
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
 
 		<!-- Display name -->
 		<ApplicationTitle>reserve flow ai 2026</ApplicationTitle>
@@ -59,13 +66,59 @@
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
+	<!-- Utility target for auditing what files the MAUI single-project glob brings into
+	     the MAUI project's Compile items. Run with:
+	     dotnet msbuild "$(MSBuildProjectFullPath)" -t:ListCompileItems
+	  or
+	     dotnet build -t:ListCompileItems
+	
+	 This will print each Compile item to the console and write a file to
+	 obj\compile_items_<TargetFramework>.txt for easy inspection. Useful to
+	 quickly catch accidental double-includes (e.g., other projects' sources or
+	 obj-generated files). -->
+	<Target Name="ListCompileItems">
+		<Message Text="--- Compile items for $(MSBuildProjectName) (TargetFramework=$(TargetFramework)) ---" Importance="High" />
+		<!-- Print each Compile item to console -->
+		<Message Text="Compile: %(Compile.Identity)" Importance="High" Condition="@(Compile) != ''" />
+		<!-- Also write a file for programmatic inspection -->
+		<WriteLinesToFile
+			File="$(IntermediateOutputPath)compile_items_$(TargetFramework).txt"
+			Lines="@(Compile)"
+			Overwrite="true"
+			Encoding="UTF-8" />
+	</Target>
+
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.8" />
+		<!-- Windows-only dependencies for prototype -->
+		<PackageReference Include="NAudio" Version="2.2.1" />
+		<PackageReference Include="sqlite-net-pcl" Version="1.8.116" />
+		<!-- Pin SQLite native bundle to ensure e_sqlite3 native assets are resolved during restore/publish -->
+		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.0.4" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="src\ReserveFlow.Core\ReserveFlow.Core.csproj" />
+	</ItemGroup>
+
+	<!-- Exclude test projects and their generated obj/bin files from the MAUI single-project globbing.
+	     SingleProject MAUI projects use a broad glob ("**/*.cs") from the repo root which can accidentally
+	     pick up other projects' source and generated files (tests/*/obj/**). That leads to duplicate
+	     assembly attributes and type conflicts during multi-target builds. Remove test sources from
+	     the MAUI project's Compile item list to prevent cross-project inclusion. -->
+	<ItemGroup>
+		<Compile Remove="tests\**\*.cs" />
+		<None Remove="tests\**\*" />
+
+		<!-- Prevent the MAUI single-project broad globs from also picking up the
+		     ReserveFlow.Core project's source files. The MAUI SingleProject mode
+		     implicitly includes "**/*.cs" from the repo; since ReserveFlow.Core is
+		     referenced as a ProjectReference, we must ensure its sources are not
+		     compiled into the MAUI project as well, which causes CS0436 duplicate
+		     type definition warnings. Remove only the Core project's folder here. -->
+		<Compile Remove="src\ReserveFlow.Core\**\*.cs" />
+		<None Remove="src\ReserveFlow.Core\**\*" />
 	</ItemGroup>
 
 </Project>

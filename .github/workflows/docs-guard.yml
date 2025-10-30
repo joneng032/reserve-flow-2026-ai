@@ -1,0 +1,42 @@
+name: Docs Guard
+
+on:
+    pull_request:
+        types: [opened, edited, synchronize, reopened]
+
+jobs:
+    docs-check:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: write
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Check PR files and require docs updates when implementation changes
+              uses: actions/github-script@v6
+              with:
+                  script: |
+                      const pr = context.payload.pull_request;
+                      if (!pr) {
+                        core.setFailed('No pull request context available.');
+                        return;
+                      }
+                      const files = await github.paginate(github.rest.pulls.listFiles, {
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        pull_number: pr.number,
+                      });
+
+                      const changed = files.map(f => f.filename);
+                      const hasCode = changed.some(p => p.startsWith('src/') || p.startsWith('Views/') || p.startsWith('Platforms/') || p === 'MauiProgram.cs' || p === 'App.xaml');
+                      const hasDocs = changed.some(p => p.startsWith('docs/') || p === 'docs/CHANGELOG.md');
+
+                      if (hasCode && !hasDocs) {
+                        const message = `This PR changes implementation files (${changed.filter(p => p.startsWith('src/') || p.startsWith('Views/') || p.startsWith('Platforms/') || p === 'MauiProgram.cs' || p === 'App.xaml').slice(0,10).join(', ')}) but does not update documentation under docs/. Please update docs/CHANGELOG.md and any architecture docs affected, or explain in the PR description.`;
+                        core.setFailed(message);
+                      } else {
+                        core.info('Docs check passed.');
+                      }

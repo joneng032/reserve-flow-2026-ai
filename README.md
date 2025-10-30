@@ -1,31 +1,20 @@
 # Reserve Flow (Native .NET MAUI)
 
-Native rewrite of the Reserve Flow app — MAUI-first implementation with feature parity to the previous React/Capacitor version.
+The canonical project documentation lives in the `docs/` folder. See `docs/README.md` for project overview, implementation plans, and migration guidance.
 
-Quick links
-- Repository: https://github.com/joneng032/reserve-flow-2026-ai
+This repository contains the MAUI implementation scaffold and developer docs. For quick access to docs and governance, open `docs/README.md`.
 
-Overview
---------
-This repository contains a .NET MAUI implementation plan and the application scaffolding for Reserve Flow — a Smart Audio Notes and AI-assisted inspection tool with BLE/IoT integrations and study framework support.
-
-Prerequisites
-- .NET SDK (8.0+ or 9.0 depending on target)
-- Visual Studio 2022/2023 with MAUI workloads (Windows) or Visual Studio for Mac (macOS)
-- Android SDK and emulators (for Android builds)
-- Xcode and macOS runner (for iOS builds)
-
-Quick start
-------------
-1. Restore and build:
+Quick start (developer)
+-----------------------
+1. Read `docs/README.md` for high-level guidance.
+2. Restore and build (PowerShell):
 
 ```powershell
-cd "F:\github\reserve flow ai 2026"
 dotnet restore
 dotnet build -f net8.0
 ```
 
-2. Run (platform-specific): open the solution in Visual Studio and run on the desired platform.
+Open the solution in Visual Studio to run on a selected platform.
 
 CI
 --

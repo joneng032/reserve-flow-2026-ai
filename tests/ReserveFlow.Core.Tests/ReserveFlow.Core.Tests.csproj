@@ -3,6 +3,11 @@
         <TargetFramework>net8.0</TargetFramework>
         <IsPackable>false</IsPackable>
         <Nullable>enable</Nullable>
+        <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+        <!-- Prevent the SDK from emitting TargetFrameworkAttribute during multi-target
+             solution builds which can cause duplicate TargetFrameworkAttribute errors
+             when other projects in the solution generate per-TFM assembly attributes. -->
+        <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     </PropertyGroup>
 
     <ItemGroup>

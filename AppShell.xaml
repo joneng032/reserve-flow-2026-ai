@@ -16,4 +16,9 @@
         ContentTemplate="{DataTemplate local:DashboardPage}"
         Route="Dashboard"/>
 
+    <ShellContent
+        Title="Record"
+        ContentTemplate="{DataTemplate local:RecordingPage}"
+        Route="Recording"/>
+
 </Shell>
