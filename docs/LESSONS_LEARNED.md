@@ -59,3 +59,7 @@ Artifactual references:
 - Files touched during the audit: `.github/workflows/list-compile-and-check.yml`, `reserve flow ai 2026.csproj` (added/updated target)
 
 If you want, I can open the GitHub issues now for the follow-ups listed above and include links back to this document and the PR.
+
+Quick local verification
+
+ - A small helper script is available at `scripts/verify_list_compile_items.ps1`. Run it locally to invoke the `ListCompileItems` MSBuild target and verify `obj/**/compile_items_*.txt` files are present and non-empty. This can be used when testing CI changes locally.
