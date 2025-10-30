@@ -1,0 +1,181 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net9.0-android;net9.0-ios;net9.0-maccatalyst</TargetFrameworks>
+		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net9.0-windows10.0.19041.0</TargetFrameworks>
+		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
+		<!-- <TargetFrameworks>$(TargetFrameworks);net9.0-tizen</TargetFrameworks> -->
+
+		<!-- Note for MacCatalyst:
+		The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
+		When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
+		The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
+		either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
+		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+
+		<OutputType>Exe</OutputType>
+		<RootNamespace>reserve_flow_ai_2026</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<!-- Prevent SDK from auto-generating assembly attributes here to avoid duplicate-attribute errors
+		     when building the multi-target MAUI single-project solution. Assembly attributes will be
+		     produced by a single project (e.g., ReserveFlow.Core) or can be provided centrally if needed. -->
+		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+		<!-- Also avoid emitting TargetFrameworkAttribute from the MAUI multi-target build so that
+		     only the canonical project (ReserveFlow.Core) supplies assembly-level attributes. -->
+		<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+
+		<!-- Display name -->
+		<ApplicationTitle>reserve flow ai 2026</ApplicationTitle>
+
+		<!-- App Identifier -->
+		<ApplicationId>com.companyname.reserveflowai2026</ApplicationId>
+
+		<!-- Versions -->
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- App Icon -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
+
+		<!-- Splash Screen -->
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
+
+		<!-- Images -->
+		<MauiImage Include="Resources\Images\*" />
+		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
+
+		<!-- Custom Fonts -->
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<!-- Utility target for auditing what files the MAUI single-project glob brings into
+		 the MAUI project's Compile items. Run with:
+		 dotnet msbuild "$(MSBuildProjectFullPath)" -t:ListCompileItems
+	  or
+		 dotnet build -t:ListCompileItems
+
+	 This will print each Compile item to the console and write a file to
+	 obj\compile_items_<TargetFramework>.txt for easy inspection. Useful to
+	 quickly catch accidental double-includes (e.g., other projects' sources or
+	 obj-generated files).
+
+	 NOTE: When MSBuild invokes a project-level target without a specific
+	 TargetFramework (e.g., certain solution-level orchestration),
+	 '$(TargetFramework)' can be empty which previously produced a
+	 root-level file named compile_items_.txt. That file is meaningless and
+	 caused CI validation failures. The changes below add guards so that the
+	 audit file is only written when a TargetFramework is present and when
+	 there are Compile items to write. -->
+	<!-- Per-TFM work: this target assumes '$(TargetFramework)' is set and writes the
+		 compile items for that single TFM. It is invoked directly when building a
+		 single TFM or via the wrapper target below which will iterate the
+		 multi-target list. -->
+	<Target Name="ListCompileItemsSingle">
+		<Message Text="--- Compile items for $(MSBuildProjectName) (TargetFramework=$(TargetFramework)) ---" Importance="High" />
+		<!-- Print each Compile item to console when present -->
+		<Message Text="Compile: %(Compile.Identity)" Importance="High" Condition="@(Compile) != ''" />
+		<Message Text="No Compile items found" Importance="High" Condition="@(Compile) == ''" />
+		<!-- Also write a file for programmatic inspection (only when there are items) -->
+		<WriteLinesToFile
+			File="$(IntermediateOutputPath)compile_items_$(TargetFramework).txt"
+			Lines="@(Compile)"
+			Overwrite="true"
+			Encoding="UTF-8"
+			Condition="@(Compile) != ''" />
+		<Message Text="Written compile items to: $(IntermediateOutputPath)compile_items_$(TargetFramework).txt" Importance="High" Condition="@(Compile) != ''" />
+
+		<!-- Also write a stable copy into the repo-root obj folder so CI workflows
+		     that search 'obj -Recurse' will reliably find per-TFM files regardless
+		     of IntermediateOutputPath layout. Create the folder if missing. -->
+		<MakeDir Directories="$(MSBuildProjectDirectory)\\obj\\$(Configuration)" Condition="!Exists('$(MSBuildProjectDirectory)\\\\obj\\\\$(Configuration)')" />
+		<WriteLinesToFile
+			File="$(MSBuildProjectDirectory)\\obj\\$(Configuration)\\compile_items_$(TargetFramework).txt"
+			Lines="@(Compile)"
+			Overwrite="true"
+			Encoding="UTF-8"
+			Condition="@(Compile) != ''" />
+		<Message Text="Written stable compile items copy to: $(MSBuildProjectDirectory)\\obj\\$(Configuration)\\compile_items_$(TargetFramework).txt" Importance="High" Condition="@(Compile) != ''" />
+	</Target>
+
+	<!-- Wrapper target: when invoked without a specific TargetFramework (for
+		 example, when MSBuild is orchestrating multi-target builds), run the
+		 single-target logic for each framework listed in TargetFrameworks. This
+		 ensures the audit files are produced for each TFM regardless of how
+		 the target was invoked. -->
+	<Target Name="ListCompileItems" DependsOnTargets="Build">
+		<!-- Remove stale root placeholder if present (both intermediate and repo-root locations) -->
+		<Delete Files="$(IntermediateOutputPath)compile_items_.txt" Condition="Exists('$(IntermediateOutputPath)compile_items_.txt')" />
+		<Delete Files="$(MSBuildProjectDirectory)\\obj\\compile_items_.txt" Condition="Exists('$(MSBuildProjectDirectory)\\\\obj\\\\compile_items_.txt')" />
+
+		<!-- If a single TFM is set, simply run the single-target logic. -->
+		<CallTarget Targets="ListCompileItemsSingle" Condition="'$(TargetFramework)' != ''" />
+
+		<!-- Otherwise, expand the TargetFrameworks property and invoke MSBuild
+			 for each TFM so the per-TFM target runs in the proper framework
+			 context. -->
+		<ItemGroup Condition="'$(TargetFramework)' == ''">
+			<!-- MSBuild will split a semicolon-separated value into multiple items when
+				 used in an ItemGroup Include. -->
+			<TFM Include="$(TargetFrameworks)" />
+		</ItemGroup>
+
+		<Message Text="Invoking per-TFM ListCompileItemsSingle for: @(TFM)" Importance="High" Condition="'$(TargetFramework)' == ''" />
+
+		<MSBuild Projects="$(MSBuildProjectFullPath)"
+				 Targets="ListCompileItemsSingle"
+				 Properties="TargetFramework=%(TFM.Identity);Configuration=$(Configuration)"
+				 Condition="'$(TargetFramework)' == ''" />
+	</Target>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.8" />
+		<!-- Windows-only dependencies for prototype -->
+		<PackageReference Include="NAudio" Version="2.2.1" />
+		<PackageReference Include="sqlite-net-pcl" Version="1.8.116" />
+		<!-- Pin SQLite native bundle to ensure e_sqlite3 native assets are resolved during restore/publish -->
+		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.0.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="src\ReserveFlow.Core\ReserveFlow.Core.csproj" />
+	</ItemGroup>
+
+	<!-- Exclude test projects and their generated obj/bin files from the MAUI single-project globbing.
+	     SingleProject MAUI projects use a broad glob ("**/*.cs") from the repo root which can accidentally
+	     pick up other projects' source and generated files (tests/*/obj/**). That leads to duplicate
+	     assembly attributes and type conflicts during multi-target builds. Remove test sources from
+	     the MAUI project's Compile item list to prevent cross-project inclusion. -->
+	<ItemGroup>
+		<Compile Remove="tests\**\*.cs" />
+		<None Remove="tests\**\*" />
+
+		<!-- Prevent the MAUI single-project broad globs from also picking up the
+		     ReserveFlow.Core project's source files. The MAUI SingleProject mode
+		     implicitly includes "**/*.cs" from the repo; since ReserveFlow.Core is
+		     referenced as a ProjectReference, we must ensure its sources are not
+		     compiled into the MAUI project as well, which causes CS0436 duplicate
+		     type definition warnings. Remove only the Core project's folder here. -->
+		<Compile Remove="src\ReserveFlow.Core\**\*.cs" />
+		<None Remove="src\ReserveFlow.Core\**\*" />
+	</ItemGroup>
+
+</Project>

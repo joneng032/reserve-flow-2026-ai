@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    Central MSBuild props for the repo.
+    NOTE: we previously tried a global GenerateAssemblyInfo + shared-AssemblyInfo approach
+    which caused duplicate assembly-attribute and file-inclusion conflicts across multi-target
+    builds. That approach is brittle with MAUI single-project multi-target builds.
+
+    Current strategy:
+    - Keep this file present for future repo-wide props.
+    - Do NOT globally set GenerateAssemblyInfo or inject a shared AssemblyInfo here.
+    - Provide per-project control: projects that should NOT auto-generate assembly attributes
+      should explicitly set <GenerateAssemblyInfo>false</GenerateAssemblyInfo> in their .csproj.
+  -->
+</Project>

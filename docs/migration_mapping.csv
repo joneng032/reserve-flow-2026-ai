@@ -1,0 +1,35 @@
+react_path,maui_target,priority,notes
+src/main.tsx,App.xaml + MauiProgram.cs,P0,App entry -> MAUI App + Shell. Ensure AppShell routes match React routes
+src/App.tsx; src/components/AppContent.tsx,AppShell.xaml + MainPage.xaml,P0,Shell structure and global layout. Map header/footer/components to Shell templates
+src/pages/Dashboard.tsx,Views/DashboardPage.xaml; src/ReserveFlow.Core/ViewModels/DashboardViewModel.cs,P1,Already implemented in MAUI repo; wire to real API client
+src/pages/Login.tsx,Views/LoginPage.xaml; src/ReserveFlow.Core/ViewModels/LoginViewModel.cs,P1,Scaffolded — integrate IAuthService and secure storage
+src/pages/ProjectDetail.tsx,Views/ProjectDetailPage.xaml; src/ReserveFlow.Core/ViewModels/ProjectDetailViewModel.cs,P1,Scaffolded — populate via IProjectsService / API client
+src/pages/ProjectTemplates.tsx,Views/ProjectTemplatesPage.xaml; src/ReserveFlow.Core/ViewModels/ProjectTemplatesViewModel.cs,P2,Templates management UI
+src/pages/Checklists.tsx,Views/ChecklistsPage.xaml; src/ReserveFlow.Core/ViewModels/ChecklistsViewModel.cs,P1,Inspection/checklist flows
+src/pages/FieldInspection.tsx,Views/FieldInspectionPage.xaml; src/ReserveFlow.Core/ViewModels/FieldInspectionViewModel.cs,P0,Voice + media + map heavy page — P0
+src/features/smart-audio/SmartAudioRecorder.tsx,Views/RecordingPage.xaml; src/ReserveFlow.Core/ViewModels/RecordingViewModel.cs,P0,Core recording UI — implement IAudioService and ISpeechService
+src/features/smart-audio/hooks/*,Services/IAudioService + RecordingViewModel tests,P0,Move hook logic into IAudioService and ViewModel
+src/features/voice/hooks/useVoiceRecognition.ts,Services/ISpeechService,P0,Wrap platform STT or local ML (VOSK/Whisper) behind ISpeechService
+src/features/voice/components/VoiceCommandButton.tsx,Controls/VoiceCommandButton.xaml; bound to RecordingViewModel,P0,Simple command + visual state
+src/services/syncService.ts,Services/ISyncService (background worker),P0,Sync queue to SQLite, retries, conflict resolution
+src/services/authService.ts,Services/IAuthService (secure storage),P1,Auth token storage and refresh, integrate with HttpClient handlers
+src/services/projectsService.ts,Services/IProjectsService + implementation,P1,Domain service port — move DTOs to Core/Models
+src/features/iot/deviceManager.ts,Services/IIoTService; Platforms/* implementations,P1,Use Shiny.BluetoothLE or Plugin.BLE wrappers
+src/components/MapView.tsx,Controls/MapViewControl.xaml; Services/IMapService,P1,Use Microsoft.Maui.Controls.Maps or Mapsui; implement pins and audio playback bindings
+src/components/CameraCapture.tsx; src/components/MediaDisplay.tsx,Services/ICameraService + Views/MediaCapturePage.xaml,P1,Camera + media viewer; use CommunityToolkit.Maui and platform APIs
+src/components/ImageAnnotator.tsx,Views/ImageAnnotatorPage.xaml; Use SkiaSharp for overlays,P1,Annotation drawing and save/export
+src/components/FileUpload.tsx,Services/IFileService + Views/FileUploadView.xaml,P1,FilePicker + upload queue + background retries
+src/components/ToggleWebLLM.tsx,Services/ILocalModelService + Views/ModelSettingsPage.xaml,P1,Toggle for cloud/local model; cloud-first recommended for MVP
+src/components/VoiceComponentCreator.tsx,Services/IAudioService + Services/ITranscriptService,P0,Voice-based note creation and attachments
+src/db/db.ts,Data/Entities + EF Core or sqlite-net migrations,P0,Map type definitions to C# entities and implement local DB
+src/types/index.ts,src/ReserveFlow.Core/Models/*,P0,Port TypeScript types to C# POCOs
+src/features/smart-audio/webLLM*; webllm-worker.js,Services/IAIService (ONNX/llama.cpp) + cloud fallback,P1,Evaluate ONNX runtime or llama.cpp wrappers; heavy models deferred
+src/scripts/*,tools/model-download scripts or CI tasks,P2,Translate scripts for model prep into build/CI steps
+capacitor.config.json; android/ios capacitor files,Platform entitlements and packaging config,P0,Replace with MAUI platform manifests and entitlements
+electron/*,Platforms/Windows & MacCatalyst packaging notes,P1,Port desktop packaging from Electron to MAUI packaging
+e2e/*; tests/*,tests/* (xUnit/Appium),P1,Port vitest/playwright tests to xUnit/Appium or device farm
+public/assets/webllm-*; dist/assets/*,Assets/Models or external hosting,P1,Plan hosted model storage or in-app optional download
+src/components/recharts usage,NuGet: LiveCharts2 (MAUI) or OxyPlot,P2,Charts will require porting UI and data binding
+src/components/tailwind usage,Resources/Styles.xaml; design tokens,P1,Translate tailwind tokens into resource dictionaries and styles
+src/components/dexie usage,NuGet: sqlite-net-pcl or EF Core + SQLite,P0,Implement local DB and migration path
+src/components/openai usage,Services/IChatService using typed HttpClient (OpenAI .NET SDK optional),P1,Use HttpClient and secure storage; abstract via IChatService

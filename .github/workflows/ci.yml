@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        dotnet: ["8.0.x"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.nuget/packages' || '~/.nuget/packages' }}
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.dotnet/tools' || '~/.dotnet/tools' }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.sln','**/*.csproj','global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Cache dotnet workload manifests
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.dotnet/workloads' || '~/.dotnet/workloads' }}
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.nuget/workloads' || '~/.nuget/workloads' }}
+          key: ${{ runner.os }}-workloads-${{ hashFiles('**/*.sln','**/*.csproj','global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-workloads-
+
+      - name: Install MAUI workloads (platform-specific)
+        shell: pwsh
+        run: |
+          if ($IsWindows) {
+            dotnet workload install maui --skip-manifest-update || true
+          } elseif ($IsMacOS) {
+            # On macOS we need iOS & macCatalyst workloads for simulator/iOS builds
+            dotnet workload install maui ios maui-maccatalyst --skip-manifest-update || true
+          } else {
+            # Linux (ubuntu) - install only workloads required for build/tests
+            dotnet workload install maui --skip-manifest-update || true
+          }
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Run unit tests (with coverage)
+        run: |
+          if (Test-Path '**/*Tests/*.csproj') {
+            # Run tests and collect coverage with coverlet
+            dotnet test --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutput=./coverage/ /p:CoverletOutputFormat=opencover
+          } else {
+            Write-Host 'No test projects found; skipping unit tests.'
+          }
+
+      - name: Publish artifacts (Release)
+        run: |
+          dotnet publish -c Release -o ./artifacts || true
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.os }}
+          path: ./artifacts
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}
+          path: ./coverage
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/*.opencover.xml
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Signing placeholders
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          echo "Signing steps placeholder -- configure secrets and signing commands."
+
+  verify-list-compile-items:
+    name: Verify ListCompileItems (post-build)
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - name: Restore
+        run: dotnet restore "reserve flow ai 2026.sln"
+
+      - name: Restore workloads
+        run: |
+          dotnet workload restore || true
+
+      - name: Run ListCompileItems verifier (CI test wrapper)
+        shell: pwsh
+        run: |
+          Write-Host "Running tests/ci/run-verifier.ps1 which wraps the verifier and asserts artifacts"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\ci\run-verifier.ps1 -Project "reserve flow ai 2026.csproj" -Configuration Debug

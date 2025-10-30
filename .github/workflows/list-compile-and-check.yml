@@ -1,0 +1,149 @@
+name: List MAUI Compile items and fail on duplicate-type warnings
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  audit-build:
+    name: Audit build and compile items
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # Start with Windows runs only to ensure hosted runners have required capabilities.
+        # Expanding to Android/iOS/macOS TFMs requires additional runner setup (workloads, SDKs).
+        os: [windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: "9.x"
+
+      - name: Restore
+        run: dotnet restore "reserve flow ai 2026.sln"
+
+      - name: Restore .NET workloads
+        # Ensure required MAUI workloads are available on the runner. This mitigates NETSDK1147.
+        run: |
+          dotnet workload restore || true
+          dotnet workload list || true
+
+      - name: Build & List Compile Items (fail on CS0436/CS0579)
+        # This builds and runs the custom ListCompileItems target added to the MAUI project.
+        # We treat CS0436/CS0579 as errors to prevent duplicate-type regressions.
+        # Quote the -warnaserror argument so PowerShell (used on windows runners) doesn't split on the semicolon.
+        run: |
+          dotnet build "reserve flow ai 2026.csproj" -c Debug "-warnaserror:CS0436;CS0579" -t:ListCompileItems
+
+      - name: Runner diagnostics: list obj and re-run ListCompileItems
+        shell: pwsh
+        run: |
+          Write-Host "--- Runner diagnostics: repo root ---"
+          Write-Host "PWD:" (Get-Location).Path
+          Write-Host "--- Quick repo listing (top 200 entries) ---"
+          Get-ChildItem -Path . -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName -First 200 | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "--- obj directory listing (recursive) ---"
+          if (Test-Path obj) { Get-ChildItem -Path obj -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName,Length | ForEach-Object { Write-Host ("{0} ({1} bytes)" -f $_.FullName,$_.Length) } } else { Write-Host "obj directory not present" }
+          Write-Host "--- Searching anywhere in repo for compile_items_*.txt ---"
+          $found = Get-ChildItem -Path . -Recurse -Filter "compile_items_*.txt" -File -ErrorAction SilentlyContinue
+          if ($found) { $found | ForEach-Object { Write-Host "Found: $($_.FullName) ($($_.Length) bytes)" } } else { Write-Host "No compile_items_*.txt found by search." }
+          Write-Host "--- Attempting to run ListCompileItems target again to force generation ---"
+          try {
+            dotnet msbuild "reserve flow ai 2026.csproj" -p:Configuration=Debug -t:ListCompileItems -v:minimal
+            $rc = $LASTEXITCODE
+          } catch {
+            Write-Host "dotnet msbuild threw an exception: $_"
+            $rc = 1
+          }
+          Write-Host "ListCompileItems invocation exit code: $rc"
+          Write-Host "--- obj listing after attempted ListCompileItems ---"
+          if (Test-Path obj) { Get-ChildItem -Path obj -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName,Length | ForEach-Object { Write-Host ("{0} ({1} bytes)" -f $_.FullName,$_.Length) } }
+
+      - name: Validate compile_items files
+        shell: pwsh
+        run: |
+          Write-Host "Validate: current directory:" (Get-Location).Path
+          $searchRoot = Join-Path $PWD.Path 'obj'
+          Write-Host "Validate: planned search root = $searchRoot"
+          Write-Host "Validate: also matching glob pattern 'obj/**/compile_items_*.txt'"
+          Write-Host "Validate: listing up to 20 entries under $searchRoot (if present)"
+          if (Test-Path $searchRoot) { Get-ChildItem -Path $searchRoot -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName -First 20 | ForEach-Object { Write-Host $_.FullName } } else { Write-Host "$searchRoot does not exist" }
+
+          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File -ErrorAction SilentlyContinue
+          if (-not $files -or $files.Count -eq 0) {
+            Write-Error "No compile_items_*.txt files found under obj/. The ListCompileItems target may have not run or wrote files to an unexpected location."
+            exit 1
+          }
+
+          $bad = @()
+          foreach ($f in $files) {
+            # Read file lines and check for at least one non-whitespace line
+            try {
+              $lines = Get-Content -Path $f.FullName -ErrorAction Stop | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -ne '' }
+            } catch {
+              $lines = @()
+            }
+            if (-not $lines -or $lines.Count -eq 0) {
+              $bad += $f.FullName
+            }
+          }
+
+          if ($bad.Count -gt 0) {
+            Write-Error "Found compile_items files with no meaningful content:`n$($bad -join "`n")"
+            exit 1
+          }
+
+          Write-Host "Found $($files.Count) compile_items files with meaningful content. Proceeding to package artifacts."
+
+      - name: Preview compile_items files (first 20 non-empty lines)
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File -ErrorAction SilentlyContinue
+          foreach ($f in $files) {
+            Write-Host "--- Preview: $($f.FullName) ---"
+            try {
+              Get-Content -Path $f.FullName | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -ne '' } | Select-Object -First 20 | ForEach-Object { Write-Host $_ }
+            } catch {
+              Write-Host "(failed to read $($f.FullName): $_)"
+            }
+            Write-Host "--- End preview ---`n"
+          }
+
+      - name: Package compile_items artifacts (per-TFM zips)
+        shell: pwsh
+        run: |
+          $outDir = "artifacts"
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File
+          if (-not $files -or $files.Count -eq 0) { Write-Error "No files to compress"; exit 1 }
+
+          # Group by filename without extension (compile_items_<tfm>) so each group becomes a per-TFM zip
+          $groups = $files | Group-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) }
+          foreach ($g in $groups) {
+            $zipName = Join-Path $outDir ("$($g.Name).zip")
+            $paths = $g.Group | Select-Object -ExpandProperty FullName
+            Compress-Archive -Path $paths -DestinationPath $zipName -Force
+            Write-Host "Created $zipName (files: $($paths.Count))"
+          }
+
+          # Also create a combined zip for convenience
+          $allPaths = $files | Select-Object -ExpandProperty FullName
+          Compress-Archive -Path $allPaths -DestinationPath "$outDir/compile_items_all.zip" -Force
+
+      - name: Upload compile_items artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile-items
+          path: |
+            artifacts/compile_items_all.zip
+            obj/**/compile_items_*.txt
+
+      - name: Show summary
+        run: |
+          echo "Uploaded compile_items_*.txt artifacts and a packaged zip. If this job fails with CS0436/CS0579, inspect the artifacts to discover duplicate sources."
