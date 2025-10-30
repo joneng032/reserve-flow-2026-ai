@@ -34,6 +34,10 @@ CI
 
 - We run a lightweight workflow that builds the MAUI project and runs the `ListCompileItems` target and uploads per-TFM artifacts. See `.github/workflows/list-compile-and-check.yml` and `.github/workflows/verify-list-compile-items.yml`.
 
+Automated verification in main CI
+
+In addition to the dedicated `verify-list-compile-items.yml` workflow, the main `ci.yml` now includes a post-build job `Verify ListCompileItems (post-build)` which runs the same verifier script on a Windows runner. This ensures the verifier executes as part of the primary CI pipeline and will fail the build if the `compile_items_*.txt` artifacts are missing or empty.
+
 Troubleshooting
 
 - If the workflow can't find `compile_items_*.txt` files, verify the `IntermediateOutputPath` and that the build target ran for each TFM. The helper script prints precise paths and fails with an error if files are missing or empty.

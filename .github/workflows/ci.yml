@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        dotnet: ['8.0.x']
+        dotnet: ["8.0.x"]
     steps:
       - uses: actions/checkout@v4
 
@@ -100,3 +100,30 @@ jobs:
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           echo "Signing steps placeholder -- configure secrets and signing commands."
+
+  verify-list-compile-items:
+    name: Verify ListCompileItems (post-build)
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.x'
+
+      - name: Restore
+        run: dotnet restore "reserve flow ai 2026.sln"
+
+      - name: Restore workloads
+        run: |
+          dotnet workload restore || true
+
+      - name: Run ListCompileItems verifier
+        shell: pwsh
+        run: |
+          Write-Host "Running verify_list_compile_items.ps1 from main CI"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify_list_compile_items.ps1 -Project "reserve flow ai 2026.csproj" -Configuration Debug
