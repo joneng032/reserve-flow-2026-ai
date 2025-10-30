@@ -1,53 +1,53 @@
 name: List MAUI Compile items and fail on duplicate-type warnings
 
 on:
-    push:
-        branches: [main, master]
-    pull_request:
-        branches: [main, master]
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
 jobs:
-    audit-build:
-        name: Audit build and compile items
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-              # Start with Windows runs only to ensure hosted runners have required capabilities.
-              # Expanding to Android/iOS/macOS TFMs requires additional runner setup (workloads, SDKs).
-              os: [windows-latest]
+  audit-build:
+    name: Audit build and compile items
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # Start with Windows runs only to ensure hosted runners have required capabilities.
+        # Expanding to Android/iOS/macOS TFMs requires additional runner setup (workloads, SDKs).
+        os: [windows-latest]
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Setup .NET
-              uses: actions/setup-dotnet@v3
-              with:
-                  dotnet-version: "9.x"
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: "9.x"
 
-            - name: Restore
-              run: dotnet restore "reserve flow ai 2026.sln"
+      - name: Restore
+        run: dotnet restore "reserve flow ai 2026.sln"
 
-            - name: Restore .NET workloads
-              # Ensure required MAUI workloads are available on the runner. This mitigates NETSDK1147.
-              run: |
-                  dotnet workload restore || true
-                  dotnet workload list || true
+      - name: Restore .NET workloads
+        # Ensure required MAUI workloads are available on the runner. This mitigates NETSDK1147.
+        run: |
+          dotnet workload restore || true
+          dotnet workload list || true
 
-            - name: Build & List Compile Items (fail on CS0436/CS0579)
-              # This builds and runs the custom ListCompileItems target added to the MAUI project.
-              # We treat CS0436/CS0579 as errors to prevent duplicate-type regressions.
-              # Quote the -warnaserror argument so PowerShell (used on windows runners) doesn't split on the semicolon.
-              run: |
-                  dotnet build "reserve flow ai 2026.csproj" -c Debug "-warnaserror:CS0436;CS0579" -t:ListCompileItems
+      - name: Build & List Compile Items (fail on CS0436/CS0579)
+        # This builds and runs the custom ListCompileItems target added to the MAUI project.
+        # We treat CS0436/CS0579 as errors to prevent duplicate-type regressions.
+        # Quote the -warnaserror argument so PowerShell (used on windows runners) doesn't split on the semicolon.
+        run: |
+          dotnet build "reserve flow ai 2026.csproj" -c Debug "-warnaserror:CS0436;CS0579" -t:ListCompileItems
 
-            - name: Upload compile_items artifacts
-              uses: actions/upload-artifact@v4
-              with:
-                  name: compile-items
-                  path: |
-                      **/obj/**/compile_items_*.txt
+      - name: Upload compile_items artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile-items
+          path: |
+            obj/Debug/**/compile_items_*.txt
 
-            - name: Show summary
-              run: |
-                  echo "Uploaded compile_items_*.txt artifacts. If this job fails with CS0436/CS0579, inspect the artifacts to discover duplicate sources."
+      - name: Show summary
+        run: |
+          echo "Uploaded compile_items_*.txt artifacts. If this job fails with CS0436/CS0579, inspect the artifacts to discover duplicate sources."
