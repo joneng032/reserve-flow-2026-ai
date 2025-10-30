@@ -26,9 +26,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.nuget/packages
-            ~/.dotnet/tools
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.nuget/packages' || '~/.nuget/packages' }}
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.dotnet/tools' || '~/.dotnet/tools' }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.sln','**/*.csproj','global.json') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
@@ -36,9 +36,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.nuget/workloads
-            ~/.dotnet/workloads
-          key: ${{ runner.os }}-workloads-${{ hashFiles('**/*.csproj') }}
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.dotnet/workloads' || '~/.dotnet/workloads' }}
+            ${{ runner.os == 'Windows' && 'C:/Users/runneradmin/.nuget/workloads' || '~/.nuget/workloads' }}
+          key: ${{ runner.os }}-workloads-${{ hashFiles('**/*.sln','**/*.csproj','global.json') }}
           restore-keys: |
             ${{ runner.os }}-workloads-
 
@@ -61,10 +61,11 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      - name: Run unit tests
+      - name: Run unit tests (with coverage)
         run: |
           if (Test-Path '**/*Tests/*.csproj') {
-            dotnet test --no-build --verbosity normal
+            # Run tests and collect coverage with coverlet
+            dotnet test --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutput=./coverage/ /p:CoverletOutputFormat=opencover
           } else {
             Write-Host 'No test projects found; skipping unit tests.'
           }
@@ -77,6 +78,22 @@ jobs:
         with:
           name: build-artifacts-${{ matrix.os }}
           path: ./artifacts
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}
+          path: ./coverage
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/*.opencover.xml
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Signing placeholders
         env:
