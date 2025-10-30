@@ -41,9 +41,40 @@ jobs:
         run: |
           dotnet build "reserve flow ai 2026.csproj" -c Debug "-warnaserror:CS0436;CS0579" -t:ListCompileItems
 
+      - name: Runner diagnostics: list obj and re-run ListCompileItems
+        shell: pwsh
+        run: |
+          Write-Host "--- Runner diagnostics: repo root ---"
+          Write-Host "PWD:" (Get-Location).Path
+          Write-Host "--- Quick repo listing (top 200 entries) ---"
+          Get-ChildItem -Path . -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName -First 200 | ForEach-Object { Write-Host $_.FullName }
+          Write-Host "--- obj directory listing (recursive) ---"
+          if (Test-Path obj) { Get-ChildItem -Path obj -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName,Length | ForEach-Object { Write-Host ("{0} ({1} bytes)" -f $_.FullName,$_.Length) } } else { Write-Host "obj directory not present" }
+          Write-Host "--- Searching anywhere in repo for compile_items_*.txt ---"
+          $found = Get-ChildItem -Path . -Recurse -Filter "compile_items_*.txt" -File -ErrorAction SilentlyContinue
+          if ($found) { $found | ForEach-Object { Write-Host "Found: $($_.FullName) ($($_.Length) bytes)" } } else { Write-Host "No compile_items_*.txt found by search." }
+          Write-Host "--- Attempting to run ListCompileItems target again to force generation ---"
+          try {
+            dotnet msbuild "reserve flow ai 2026.csproj" -p:Configuration=Debug -t:ListCompileItems -v:minimal
+            $rc = $LASTEXITCODE
+          } catch {
+            Write-Host "dotnet msbuild threw an exception: $_"
+            $rc = 1
+          }
+          Write-Host "ListCompileItems invocation exit code: $rc"
+          Write-Host "--- obj listing after attempted ListCompileItems ---"
+          if (Test-Path obj) { Get-ChildItem -Path obj -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName,Length | ForEach-Object { Write-Host ("{0} ({1} bytes)" -f $_.FullName,$_.Length) } }
+
       - name: Validate compile_items files
         shell: pwsh
         run: |
+          Write-Host "Validate: current directory:" (Get-Location).Path
+          $searchRoot = Join-Path $PWD.Path 'obj'
+          Write-Host "Validate: planned search root = $searchRoot"
+          Write-Host "Validate: also matching glob pattern 'obj/**/compile_items_*.txt'"
+          Write-Host "Validate: listing up to 20 entries under $searchRoot (if present)"
+          if (Test-Path $searchRoot) { Get-ChildItem -Path $searchRoot -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName -First 20 | ForEach-Object { Write-Host $_.FullName } } else { Write-Host "$searchRoot does not exist" }
+
           $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File -ErrorAction SilentlyContinue
           if (-not $files -or $files.Count -eq 0) {
             Write-Error "No compile_items_*.txt files found under obj/. The ListCompileItems target may have not run or wrote files to an unexpected location."
