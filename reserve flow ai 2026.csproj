@@ -84,23 +84,65 @@
 	 caused CI validation failures. The changes below add guards so that the
 	 audit file is only written when a TargetFramework is present and when
 	 there are Compile items to write. -->
-	<Target Name="ListCompileItems" DependsOnTargets="Build">
+	<!-- Per-TFM work: this target assumes '$(TargetFramework)' is set and writes the
+		 compile items for that single TFM. It is invoked directly when building a
+		 single TFM or via the wrapper target below which will iterate the
+		 multi-target list. -->
+	<Target Name="ListCompileItemsSingle">
 		<Message Text="--- Compile items for $(MSBuildProjectName) (TargetFramework=$(TargetFramework)) ---" Importance="High" />
-		<!-- Remove any previously-created root-level placeholder file that has an empty TFM
-			 because earlier invocations (or earlier tooling) may have left it behind
-			 and CI validation should not fail on that stale artifact. -->
-		<Delete Files="$(IntermediateOutputPath)compile_items_.txt" Condition="Exists('$(IntermediateOutputPath)compile_items_.txt')" />
 		<!-- Print each Compile item to console when present -->
-		<Message Text="Compile: %(Compile.Identity)" Importance="High" Condition="@(Compile) != '' AND '$(TargetFramework)' != ''" />
-		<Message Text="No Compile items found" Importance="High" Condition="@(Compile) == '' AND '$(TargetFramework)' != ''" />
-		<!-- Only write a compile items file when we have a TFM and there are compile items -->
+		<Message Text="Compile: %(Compile.Identity)" Importance="High" Condition="@(Compile) != ''" />
+		<Message Text="No Compile items found" Importance="High" Condition="@(Compile) == ''" />
+		<!-- Also write a file for programmatic inspection (only when there are items) -->
 		<WriteLinesToFile
 			File="$(IntermediateOutputPath)compile_items_$(TargetFramework).txt"
 			Lines="@(Compile)"
 			Overwrite="true"
 			Encoding="UTF-8"
-			Condition="@(Compile) != '' AND '$(TargetFramework)' != ''" />
-		<Message Text="Written compile items to: $(IntermediateOutputPath)compile_items_$(TargetFramework).txt" Importance="High" Condition="@(Compile) != '' AND '$(TargetFramework)' != ''" />
+			Condition="@(Compile) != ''" />
+		<Message Text="Written compile items to: $(IntermediateOutputPath)compile_items_$(TargetFramework).txt" Importance="High" Condition="@(Compile) != ''" />
+
+		<!-- Also write a stable copy into the repo-root obj folder so CI workflows
+		     that search 'obj -Recurse' will reliably find per-TFM files regardless
+		     of IntermediateOutputPath layout. Create the folder if missing. -->
+		<MakeDir Directories="$(MSBuildProjectDirectory)\\obj\\$(Configuration)" Condition="!Exists('$(MSBuildProjectDirectory)\\\\obj\\\\$(Configuration)')" />
+		<WriteLinesToFile
+			File="$(MSBuildProjectDirectory)\\obj\\$(Configuration)\\compile_items_$(TargetFramework).txt"
+			Lines="@(Compile)"
+			Overwrite="true"
+			Encoding="UTF-8"
+			Condition="@(Compile) != ''" />
+		<Message Text="Written stable compile items copy to: $(MSBuildProjectDirectory)\\obj\\$(Configuration)\\compile_items_$(TargetFramework).txt" Importance="High" Condition="@(Compile) != ''" />
+	</Target>
+
+	<!-- Wrapper target: when invoked without a specific TargetFramework (for
+		 example, when MSBuild is orchestrating multi-target builds), run the
+		 single-target logic for each framework listed in TargetFrameworks. This
+		 ensures the audit files are produced for each TFM regardless of how
+		 the target was invoked. -->
+	<Target Name="ListCompileItems" DependsOnTargets="Build">
+		<!-- Remove stale root placeholder if present (both intermediate and repo-root locations) -->
+		<Delete Files="$(IntermediateOutputPath)compile_items_.txt" Condition="Exists('$(IntermediateOutputPath)compile_items_.txt')" />
+		<Delete Files="$(MSBuildProjectDirectory)\\obj\\compile_items_.txt" Condition="Exists('$(MSBuildProjectDirectory)\\\\obj\\\\compile_items_.txt')" />
+
+		<!-- If a single TFM is set, simply run the single-target logic. -->
+		<CallTarget Targets="ListCompileItemsSingle" Condition="'$(TargetFramework)' != ''" />
+
+		<!-- Otherwise, expand the TargetFrameworks property and invoke MSBuild
+			 for each TFM so the per-TFM target runs in the proper framework
+			 context. -->
+		<ItemGroup Condition="'$(TargetFramework)' == ''">
+			<!-- MSBuild will split a semicolon-separated value into multiple items when
+				 used in an ItemGroup Include. -->
+			<TFM Include="$(TargetFrameworks)" />
+		</ItemGroup>
+
+		<Message Text="Invoking per-TFM ListCompileItemsSingle for: @(TFM)" Importance="High" Condition="'$(TargetFramework)' == ''" />
+
+		<MSBuild Projects="$(MSBuildProjectFullPath)"
+				 Targets="ListCompileItemsSingle"
+				 Properties="TargetFramework=%(TFM.Identity);Configuration=$(Configuration)"
+				 Condition="'$(TargetFramework)' == ''" />
 	</Target>
 
 	<ItemGroup>
