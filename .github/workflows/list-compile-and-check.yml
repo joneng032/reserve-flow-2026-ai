@@ -56,14 +56,26 @@ jobs:
           }
           Write-Host "Found $($files.Count) compile_items files. Proceeding to package artifacts."
 
-      - name: Package compile_items artifacts (zip)
+      - name: Package compile_items artifacts (per-TFM zips)
         shell: pwsh
         run: |
           $outDir = "artifacts"
           New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File | Select-Object -ExpandProperty FullName
-          if (-not $files) { Write-Error "No files to compress"; exit 1 }
-          Compress-Archive -Path $files -DestinationPath "$outDir/compile_items_all.zip" -Force
+          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File
+          if (-not $files -or $files.Count -eq 0) { Write-Error "No files to compress"; exit 1 }
+
+          # Group by filename without extension (compile_items_<tfm>) so each group becomes a per-TFM zip
+          $groups = $files | Group-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) }
+          foreach ($g in $groups) {
+            $zipName = Join-Path $outDir ("$($g.Name).zip")
+            $paths = $g.Group | Select-Object -ExpandProperty FullName
+            Compress-Archive -Path $paths -DestinationPath $zipName -Force
+            Write-Host "Created $zipName (files: $($paths.Count))"
+          }
+
+          # Also create a combined zip for convenience
+          $allPaths = $files | Select-Object -ExpandProperty FullName
+          Compress-Archive -Path $allPaths -DestinationPath "$outDir/compile_items_all.zip" -Force
 
       - name: Upload compile_items artifacts
         uses: actions/upload-artifact@v4
