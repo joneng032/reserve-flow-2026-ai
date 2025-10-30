@@ -122,8 +122,8 @@ jobs:
         run: |
           dotnet workload restore || true
 
-      - name: Run ListCompileItems verifier
+      - name: Run ListCompileItems verifier (CI test wrapper)
         shell: pwsh
         run: |
-          Write-Host "Running verify_list_compile_items.ps1 from main CI"
-          pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\verify_list_compile_items.ps1 -Project "reserve flow ai 2026.csproj" -Configuration Debug
+          Write-Host "Running tests/ci/run-verifier.ps1 which wraps the verifier and asserts artifacts"
+          pwsh -NoProfile -ExecutionPolicy Bypass -File .\tests\ci\run-verifier.ps1 -Project "reserve flow ai 2026.csproj" -Configuration Debug
