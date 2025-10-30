@@ -19,6 +19,10 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
-		return builder.Build();
+	// Register core services and viewmodels (scaffold)
+	builder.Services.AddSingleton<ReserveFlow.Core.Services.IProjectsService, ReserveFlow.Core.Services.ProjectsService>();
+	builder.Services.AddSingleton<ReserveFlow.Core.ViewModels.DashboardViewModel>();
+
+	return builder.Build();
 	}
 }

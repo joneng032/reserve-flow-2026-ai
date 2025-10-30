@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="reserve_flow_ai_2026.DashboardPage"
+    Title="Dashboard">
+
+    <VerticalStackLayout Padding="12">
+        <Label Text="Dashboard" FontSize="24" />
+
+        <Button Text="Refresh" x:Name="RefreshBtn" />
+
+        <CollectionView x:Name="ProjectsList" Margin="0,12,0,0">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Frame Padding="8" Margin="4" HasShadow="True">
+                        <VerticalStackLayout>
+                            <Label Text="{Binding Title}" FontAttributes="Bold" />
+                            <Label Text="{Binding Description}" LineBreakMode="TailTruncation" />
+                        </VerticalStackLayout>
+                    </Frame>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </VerticalStackLayout>
+
+</ContentPage>
