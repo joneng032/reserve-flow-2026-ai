@@ -6,17 +6,24 @@
     Title="Dashboard">
 
     <VerticalStackLayout Padding="12">
-        <Label Text="Dashboard" FontSize="24" />
+        <Label Text="Dashboard"
+                FontSize="24"/>
 
-        <Button Text="Refresh" x:Name="RefreshBtn" />
+        <Button Text="Refresh"
+                x:Name="RefreshBtn"/>
 
-        <CollectionView x:Name="ProjectsList" Margin="0,12,0,0">
+        <CollectionView x:Name="ProjectsList"
+                Margin="0,12,0,0">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <Frame Padding="8" Margin="4" HasShadow="True">
+                    <Frame Padding="8"
+                            Margin="4"
+                            HasShadow="True">
                         <VerticalStackLayout>
-                            <Label Text="{Binding Title}" FontAttributes="Bold" />
-                            <Label Text="{Binding Description}" LineBreakMode="TailTruncation" />
+                            <Label Text="{Binding Title}"
+                                    FontAttributes="Bold"/>
+                            <Label Text="{Binding Description}"
+                                    LineBreakMode="TailTruncation"/>
                         </VerticalStackLayout>
                     </Frame>
                 </DataTemplate>

@@ -4,6 +4,8 @@ namespace reserve_flow_ai_2026;
 
 public static class MauiProgram
 {
+	public static IServiceProvider? Services { get; private set; }
+
 	public static MauiApp CreateMauiApp()
 	{
 		var builder = MauiApp.CreateBuilder();
@@ -19,10 +21,14 @@ public static class MauiProgram
 		builder.Logging.AddDebug();
 #endif
 
-	// Register core services and viewmodels (scaffold)
-	builder.Services.AddSingleton<ReserveFlow.Core.Services.IProjectsService, ReserveFlow.Core.Services.ProjectsService>();
-	builder.Services.AddSingleton<ReserveFlow.Core.ViewModels.DashboardViewModel>();
+		// Register core services and viewmodels (scaffold)
+		builder.Services.AddTransient<ReserveFlow.Core.Services.IProjectsService, ReserveFlow.Core.Services.ProjectsService>();
+		builder.Services.AddTransient<ReserveFlow.Core.ViewModels.DashboardViewModel>();
+		builder.Services.AddTransient<DashboardPage>();
 
-	return builder.Build();
+		var app = builder.Build();
+		Services = app.Services;
+
+		return app;
 	}
 }

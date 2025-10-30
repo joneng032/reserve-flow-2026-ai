@@ -6,6 +6,6 @@ namespace ReserveFlow.Core.Services;
 
 public interface IProjectsService
 {
-	Task<IEnumerable<Project>> GetProjectsAsync();
+    Task<IEnumerable<Project>> GetProjectsAsync();
 }
 

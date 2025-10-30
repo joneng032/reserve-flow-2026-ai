@@ -7,13 +7,12 @@ public partial class DashboardPage : ContentPage
 {
     private readonly DashboardViewModel _vm;
 
-    public DashboardPage()
+    // ViewModel will be provided by DI when the page is created via the service provider.
+    public DashboardPage(DashboardViewModel vm)
     {
         InitializeComponent();
 
-        // Simple scaffold: instantiate ViewModel with default service.
-        // We'll wire DI in MauiProgram later; for now create a concrete ProjectsService.
-        _vm = new DashboardViewModel(new ReserveFlow.Core.Services.ProjectsService());
+        _vm = vm;
         BindingContext = _vm;
 
         RefreshBtn.Clicked += async (_, __) => await _vm.LoadProjectsAsync();
