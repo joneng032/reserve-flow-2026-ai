@@ -49,12 +49,26 @@ jobs:
             Write-Error "No compile_items_*.txt files found under obj/. The ListCompileItems target may have not run or wrote files to an unexpected location."
             exit 1
           }
-          $empty = $files | Where-Object { $_.Length -eq 0 }
-          if ($empty) {
-            Write-Error "Found empty compile_items files:`n$($empty | ForEach-Object { $_.FullName } | Out-String)"
+
+          $bad = @()
+          foreach ($f in $files) {
+            # Read file lines and check for at least one non-whitespace line
+            try {
+              $lines = Get-Content -Path $f.FullName -ErrorAction Stop | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -ne '' }
+            } catch {
+              $lines = @()
+            }
+            if (-not $lines -or $lines.Count -eq 0) {
+              $bad += $f.FullName
+            }
+          }
+
+          if ($bad.Count -gt 0) {
+            Write-Error "Found compile_items files with no meaningful content:`n$($bad -join "`n")"
             exit 1
           }
-          Write-Host "Found $($files.Count) compile_items files. Proceeding to package artifacts."
+
+          Write-Host "Found $($files.Count) compile_items files with meaningful content. Proceeding to package artifacts."
 
       - name: Package compile_items artifacts (per-TFM zips)
         shell: pwsh
