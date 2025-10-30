@@ -67,25 +67,40 @@
 	</ItemGroup>
 
 	<!-- Utility target for auditing what files the MAUI single-project glob brings into
-	     the MAUI project's Compile items. Run with:
-	     dotnet msbuild "$(MSBuildProjectFullPath)" -t:ListCompileItems
+		 the MAUI project's Compile items. Run with:
+		 dotnet msbuild "$(MSBuildProjectFullPath)" -t:ListCompileItems
 	  or
-	     dotnet build -t:ListCompileItems
-	
+		 dotnet build -t:ListCompileItems
+
 	 This will print each Compile item to the console and write a file to
 	 obj\compile_items_<TargetFramework>.txt for easy inspection. Useful to
 	 quickly catch accidental double-includes (e.g., other projects' sources or
-	 obj-generated files). -->
-	<Target Name="ListCompileItems">
+	 obj-generated files).
+
+	 NOTE: When MSBuild invokes a project-level target without a specific
+	 TargetFramework (e.g., certain solution-level orchestration),
+	 '$(TargetFramework)' can be empty which previously produced a
+	 root-level file named compile_items_.txt. That file is meaningless and
+	 caused CI validation failures. The changes below add guards so that the
+	 audit file is only written when a TargetFramework is present and when
+	 there are Compile items to write. -->
+	<Target Name="ListCompileItems" DependsOnTargets="Build">
 		<Message Text="--- Compile items for $(MSBuildProjectName) (TargetFramework=$(TargetFramework)) ---" Importance="High" />
-		<!-- Print each Compile item to console -->
-		<Message Text="Compile: %(Compile.Identity)" Importance="High" Condition="@(Compile) != ''" />
-		<!-- Also write a file for programmatic inspection -->
+		<!-- Remove any previously-created root-level placeholder file that has an empty TFM
+			 because earlier invocations (or earlier tooling) may have left it behind
+			 and CI validation should not fail on that stale artifact. -->
+		<Delete Files="$(IntermediateOutputPath)compile_items_.txt" Condition="Exists('$(IntermediateOutputPath)compile_items_.txt')" />
+		<!-- Print each Compile item to console when present -->
+		<Message Text="Compile: %(Compile.Identity)" Importance="High" Condition="@(Compile) != '' AND '$(TargetFramework)' != ''" />
+		<Message Text="No Compile items found" Importance="High" Condition="@(Compile) == '' AND '$(TargetFramework)' != ''" />
+		<!-- Only write a compile items file when we have a TFM and there are compile items -->
 		<WriteLinesToFile
 			File="$(IntermediateOutputPath)compile_items_$(TargetFramework).txt"
 			Lines="@(Compile)"
 			Overwrite="true"
-			Encoding="UTF-8" />
+			Encoding="UTF-8"
+			Condition="@(Compile) != '' AND '$(TargetFramework)' != ''" />
+		<Message Text="Written compile items to: $(IntermediateOutputPath)compile_items_$(TargetFramework).txt" Importance="High" Condition="@(Compile) != '' AND '$(TargetFramework)' != ''" />
 	</Target>
 
 	<ItemGroup>
