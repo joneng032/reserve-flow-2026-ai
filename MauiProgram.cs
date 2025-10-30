@@ -29,11 +29,19 @@ public static class MauiProgram
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.IStorageService, ReserveFlow.Core.Services.StorageService>();
 
 		// Platform-specific registrations
-		// Platform-specific registrations
 		// Use compile-time guards so non-Windows TFMs don't need to resolve Windows-only types.
 		#if WINDOWS
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.IAudioService, reserve_flow_ai_2026.Platforms.Windows.WindowsAudioService>();
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.ISpeechService, reserve_flow_ai_2026.Platforms.Windows.WindowsSpeechService>();
+		#elif ANDROID
+		// Android-specific audio implementation
+		builder.Services.AddSingleton<ReserveFlow.Core.Services.IAudioService, reserve_flow_ai_2026.Platforms.Android.AndroidAudioService>();
+		// Use core SpeechService as a fallback until platform-specific speech is implemented
+		builder.Services.AddSingleton<ReserveFlow.Core.Services.ISpeechService, ReserveFlow.Core.Services.SpeechService>();
+		#elif IOS || MACCATALYST
+		// iOS/macOS platform implementations can be added here later
+		builder.Services.AddSingleton<ReserveFlow.Core.Services.IAudioService, ReserveFlow.Core.Services.AudioService>();
+		builder.Services.AddSingleton<ReserveFlow.Core.Services.ISpeechService, ReserveFlow.Core.Services.SpeechService>();
 		#else
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.IAudioService, ReserveFlow.Core.Services.AudioService>();
 		builder.Services.AddSingleton<ReserveFlow.Core.Services.ISpeechService, ReserveFlow.Core.Services.SpeechService>();
