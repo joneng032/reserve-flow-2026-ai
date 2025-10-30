@@ -1,0 +1,9 @@
+# Ignore VS Code workspace files
+*.code-workspace
+
+# Ignore build artifacts
+bin/
+obj/
+
+# Ignore local user settings
+.vscode/
