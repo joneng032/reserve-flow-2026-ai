@@ -41,13 +41,38 @@ jobs:
         run: |
           dotnet build "reserve flow ai 2026.csproj" -c Debug "-warnaserror:CS0436;CS0579" -t:ListCompileItems
 
+      - name: Validate compile_items files
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File -ErrorAction SilentlyContinue
+          if (-not $files -or $files.Count -eq 0) {
+            Write-Error "No compile_items_*.txt files found under obj/. The ListCompileItems target may have not run or wrote files to an unexpected location."
+            exit 1
+          }
+          $empty = $files | Where-Object { $_.Length -eq 0 }
+          if ($empty) {
+            Write-Error "Found empty compile_items files:`n$($empty | ForEach-Object { $_.FullName } | Out-String)"
+            exit 1
+          }
+          Write-Host "Found $($files.Count) compile_items files. Proceeding to package artifacts."
+
+      - name: Package compile_items artifacts (zip)
+        shell: pwsh
+        run: |
+          $outDir = "artifacts"
+          New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File | Select-Object -ExpandProperty FullName
+          if (-not $files) { Write-Error "No files to compress"; exit 1 }
+          Compress-Archive -Path $files -DestinationPath "$outDir/compile_items_all.zip" -Force
+
       - name: Upload compile_items artifacts
         uses: actions/upload-artifact@v4
         with:
           name: compile-items
           path: |
+            artifacts/compile_items_all.zip
             obj/**/compile_items_*.txt
 
       - name: Show summary
         run: |
-          echo "Uploaded compile_items_*.txt artifacts. If this job fails with CS0436/CS0579, inspect the artifacts to discover duplicate sources."
+          echo "Uploaded compile_items_*.txt artifacts and a packaged zip. If this job fails with CS0436/CS0579, inspect the artifacts to discover duplicate sources."
