@@ -1,0 +1,11 @@
+{
+  // Folder-specific settings for the MAUI project
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true
+  },
+  "editor.formatOnSave": true,
+  "csharp.format.enable": true,
+  "csharp.suppressDotnetRestoreNotification": true,
+  "omnisharp.useModernNet": true
+}
