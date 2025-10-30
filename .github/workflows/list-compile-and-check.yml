@@ -70,6 +70,20 @@ jobs:
 
           Write-Host "Found $($files.Count) compile_items files with meaningful content. Proceeding to package artifacts."
 
+      - name: Preview compile_items files (first 20 non-empty lines)
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path obj -Recurse -Filter "compile_items_*.txt" -File -ErrorAction SilentlyContinue
+          foreach ($f in $files) {
+            Write-Host "--- Preview: $($f.FullName) ---"
+            try {
+              Get-Content -Path $f.FullName | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -ne '' } | Select-Object -First 20 | ForEach-Object { Write-Host $_ }
+            } catch {
+              Write-Host "(failed to read $($f.FullName): $_)"
+            }
+            Write-Host "--- End preview ---`n"
+          }
+
       - name: Package compile_items artifacts (per-TFM zips)
         shell: pwsh
         run: |
